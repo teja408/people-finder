@@ -194,32 +194,71 @@ export const HumanDetector = () => {
   };
 
   const handleFile = (file: File) => {
-    if (!model) return;
+    if (!model) {
+      toast.error("Model not ready yet");
+      return;
+    }
     stopAll();
     setMode("image");
     setSpecies({});
     setAnimals([]);
-    setStatus("Analyzing image...");
+    setPersonCount(0);
+    setAnimalCount(0);
+    setObjectCount(0);
+    setStatus("Loading image...");
+
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = async () => {
-      const maxW = 1024;
-      const scale = img.width > maxW ? maxW / img.width : 1;
-      const w = Math.round(img.width * scale);
-      const h = Math.round(img.height * scale);
-      const tmp = document.createElement("canvas");
-      tmp.width = w; tmp.height = h;
-      tmp.getContext("2d")!.drawImage(img, 0, 0, w, h);
-      sourceCanvasRef.current = tmp;
-      setOriginalImage(tmp.toDataURL("image/jpeg", 0.9));
-      const preds = await model.detect(tmp);
-      const { persons, animals: a, objects } = drawDetections(preds, w, h, tmp);
-      setPersonCount(persons);
-      setAnimalCount(a.length);
-      setObjectCount(objects);
-      setAnimals(a);
-      setStatus(`Detection complete · ${persons} people · ${a.length} animals · ${objects} objects`);
+    img.onerror = () => {
+      toast.error("Could not load that image");
+      setStatus("Image failed to load.");
       URL.revokeObjectURL(url);
+    };
+    img.onload = async () => {
+      try {
+        // Resize source for stable detection (max 1024 wide)
+        const maxW = 1024;
+        const scale = img.width > maxW ? maxW / img.width : 1;
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const tmp = document.createElement("canvas");
+        tmp.width = w; tmp.height = h;
+        tmp.getContext("2d")!.drawImage(img, 0, 0, w, h);
+        sourceCanvasRef.current = tmp;
+        setOriginalImage(tmp.toDataURL("image/jpeg", 0.92));
+        setStatus("Analyzing image...");
+
+        // CRITICAL: wait for React to mount the image-mode canvas before drawing
+        // (canvasRef is shared between viewport modes — must let DOM update first)
+        const waitForCanvas = async () => {
+          for (let i = 0; i < 30; i++) {
+            if (canvasRef.current) return canvasRef.current;
+            await new Promise((r) => requestAnimationFrame(() => r(null)));
+          }
+          return canvasRef.current;
+        };
+        await waitForCanvas();
+        if (!canvasRef.current) {
+          throw new Error("Canvas not available");
+        }
+
+        // Run detection with higher box budget for better recall
+        const preds = await model.detect(tmp, 40, 0.5);
+        const { persons, animals: a, objects } = drawDetections(preds, w, h, tmp);
+        setPersonCount(persons);
+        setAnimalCount(a.length);
+        setObjectCount(objects);
+        setAnimals(a);
+        setStatus(
+          `Detection complete · ${persons} people · ${a.length} animals · ${objects} objects`,
+        );
+      } catch (err) {
+        console.error("Detection failed:", err);
+        toast.error("Detection failed. Please try another image.");
+        setStatus("Detection failed.");
+      } finally {
+        URL.revokeObjectURL(url);
+      }
     };
     img.src = url;
   };
