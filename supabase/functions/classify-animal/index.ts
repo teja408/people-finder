@@ -25,23 +25,33 @@ Deno.serve(async (req) => {
     const isScene = mode === "scene";
 
     const prompt = isScene
-      ? `You are a precise visual recognition expert. Identify EVERY distinct subject visible in this image (animals of any species, people, and notable objects/things — including items COCO-SSD cannot detect like specific animal species, tools, plants, devices, etc.).
+      ? `You are a precise visual recognition expert. Identify EVERY distinct subject visible in this image — animals (any species), people, and notable objects/things (cars, books, pens, phones, cups, plants, tools, devices, etc.).
+
+For EACH individual instance, return a tight bounding box in NORMALIZED coordinates (0.0 to 1.0) where:
+- x_min, y_min = top-left corner (0,0 is top-left of image)
+- x_max, y_max = bottom-right corner (1,1 is bottom-right)
 
 Return STRICT JSON with this exact shape and no extra text:
 {
   "summary": "one short sentence describing the scene",
   "subjects": [
     {
-      "name": "specific common name (e.g. 'Bengal Tiger', 'Red Fox', 'iPhone', 'Acoustic Guitar')",
+      "name": "specific common name (e.g. 'Bengal Tiger', 'Red Fox', 'iPhone', 'Book', 'Pen', 'Car')",
       "category": "animal" | "person" | "object" | "plant" | "vehicle" | "food" | "other",
       "scientific_name": "Latin binomial if animal/plant, else null",
       "count": integer (how many of this subject are visible),
       "confidence": 0-100 integer,
-      "facts": ["short fact 1", "short fact 2"]
+      "facts": ["short fact 1", "short fact 2"],
+      "boxes": [
+        { "x_min": 0.12, "y_min": 0.34, "x_max": 0.56, "y_max": 0.78 }
+      ]
     }
   ]
 }
-Be specific — prefer "Golden Retriever" over "dog", "Honeybee" over "insect".`
+Rules:
+- The "boxes" array MUST contain one box per visible instance (length should equal "count").
+- Be specific — prefer "Golden Retriever" over "dog", "Honeybee" over "insect".
+- Include everyday objects like books, pens, phones, cups, cars even if small.`
       : `You are an expert at identifying animals, objects, and things in images. Identify the MAIN subject in this cropped image — it could be any animal species, a person, or any object/item.${
           hint ? ` Coarse class hint from object detector: "${hint}".` : ""
         }
