@@ -521,9 +521,9 @@ export const HumanDetector = () => {
         if (aiCanvasRef.current) break;
         await new Promise((r) => requestAnimationFrame(() => r(null)));
       }
-      drawSceneOverlay(result);
-      const totalBoxes = result.subjects.reduce((n, s) => n + (s.boxes?.length ?? 0), 0);
-      toast.success(`AI identified ${result.subjects.length} subject(s) · ${totalBoxes} labels`);
+      drawSceneOverlay(filtered);
+      const totalBoxes = filtered.subjects.reduce((n, s) => n + (s.boxes?.length ?? 0), 0);
+      toast.success(`AI identified ${filtered.subjects.length} subject(s) · ${totalBoxes} labels`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "AI identification failed";
       toast.error(msg);
