@@ -302,6 +302,7 @@ export const HumanDetector = () => {
 
     const url = URL.createObjectURL(file);
     const img = new Image();
+    img.decoding = "async";
     img.onerror = () => {
       toast.error("Could not load that image");
       setStatus("Image failed to load.");
@@ -309,9 +310,9 @@ export const HumanDetector = () => {
     };
     img.onload = async () => {
       try {
-        // Resize source for stable detection (max 1024 wide)
-        const maxW = 1024;
-        const scale = img.width > maxW ? maxW / img.width : 1;
+        // Keep more detail for small people/animals while capping very large photos.
+        const longestSide = Math.max(img.width, img.height);
+        const scale = longestSide > IMAGE_MAX_SIDE ? IMAGE_MAX_SIDE / longestSide : 1;
         const w = Math.max(1, Math.round(img.width * scale));
         const h = Math.max(1, Math.round(img.height * scale));
         const tmp = document.createElement("canvas");
@@ -335,8 +336,8 @@ export const HumanDetector = () => {
           throw new Error("Canvas not available");
         }
 
-        // Run detection with higher box budget for better recall
-        const preds = await model.detect(tmp, 40, 0.35);
+        // Run with a lower threshold for people/animals, then filter objects separately.
+        const preds = await detectAccurately(tmp);
         const { persons, animals: a, objects } = drawDetections(preds, w, h, tmp);
         setPersonCount(persons);
         setAnimalCount(a.length);
