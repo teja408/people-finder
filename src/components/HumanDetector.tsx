@@ -33,6 +33,7 @@ export const HumanDetector = () => {
   const [animals, setAnimals] = useState<Detection[]>([]);
   const [classifying, setClassifying] = useState<number | null>(null);
   const [species, setSpecies] = useState<Record<number, SpeciesResult>>({});
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -126,6 +127,7 @@ export const HumanDetector = () => {
     setMode("camera");
     setSpecies({});
     setAnimals([]);
+    setOriginalImage(null);
     setStatus("Requesting webcam...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -169,6 +171,7 @@ export const HumanDetector = () => {
     setAnimalCount(0);
     setAnimals([]);
     setSpecies({});
+    setOriginalImage(null);
     const c = canvasRef.current;
     if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
   };
@@ -191,6 +194,7 @@ export const HumanDetector = () => {
       tmp.width = w; tmp.height = h;
       tmp.getContext("2d")!.drawImage(img, 0, 0, w, h);
       sourceCanvasRef.current = tmp;
+      setOriginalImage(tmp.toDataURL("image/jpeg", 0.9));
       const preds = await model.detect(tmp);
       const { persons, animals: a } = drawDetections(preds, w, h, tmp);
       setPersonCount(persons);
@@ -270,52 +274,91 @@ export const HumanDetector = () => {
         </div>
       </div>
 
-      {/* Viewport */}
-      <div className="relative aspect-video w-full border border-border bg-card/40 backdrop-blur overflow-hidden corner-brackets shadow-neon">
-        <div className="absolute inset-0 grid-bg opacity-40" />
+      {/* Side-by-side comparison for image uploads */}
+      {mode === "image" && originalImage && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+          <figure className="border border-border bg-card/40 backdrop-blur overflow-hidden corner-brackets">
+            <div className="aspect-video w-full bg-background/40 flex items-center justify-center overflow-hidden">
+              <img src={originalImage} alt="Original upload" className="w-full h-full object-contain" />
+            </div>
+            <figcaption className="border-t border-border px-4 py-2 text-xs uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+              <ImageIcon className="h-3 w-3 text-primary" />
+              Your Image
+            </figcaption>
+          </figure>
+          <figure className="border border-border bg-card/40 backdrop-blur overflow-hidden corner-brackets shadow-neon">
+            <div className="aspect-video w-full bg-background/40 flex items-center justify-center overflow-hidden">
+              <canvas ref={canvasRef} className="w-full h-full object-contain" />
+            </div>
+            <figcaption className="border-t border-border px-4 py-2 text-xs uppercase tracking-widest flex items-center justify-between">
+              <span className="flex items-center gap-2 text-primary text-glow">
+                <Sparkles className="h-3 w-3" />
+                Model Predicted
+              </span>
+              <span className="text-muted-foreground">{personCount}P · {animalCount}A</span>
+            </figcaption>
+          </figure>
+        </div>
+      )}
 
-        {mode === "idle" && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-6">
-            {loading ? (
-              <>
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground uppercase tracking-widest">Loading neural network...</p>
-              </>
-            ) : (
-              <>
-                <div className="h-16 w-16 rounded-full border-2 border-primary flex items-center justify-center animate-pulse-ring">
-                  <Users className="h-7 w-7 text-primary" />
-                </div>
-                <p className="text-sm text-muted-foreground uppercase tracking-widest">Awaiting input signal</p>
-                <p className="text-xs text-muted-foreground/70 max-w-md">
-                  Detects people and animals in real time. Tap "Identify species" to classify any detected animal via the cloud AI.
-                </p>
-              </>
-            )}
-          </div>
-        )}
+      {/* Viewport (idle + camera) */}
+      {mode !== "image" && (
+        <div className="relative aspect-video w-full border border-border bg-card/40 backdrop-blur overflow-hidden corner-brackets shadow-neon">
+          <div className="absolute inset-0 grid-bg opacity-40" />
 
-        <video ref={videoRef} className="hidden" playsInline muted />
-        <canvas
-          ref={canvasRef}
-          className={cn(
-            "absolute inset-0 w-full h-full object-contain transition-opacity duration-300",
-            mode === "idle" ? "opacity-0" : "opacity-100",
+          {mode === "idle" && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-center px-6">
+              {loading ? (
+                <>
+                  <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground uppercase tracking-widest">Loading neural network...</p>
+                </>
+              ) : (
+                <>
+                  <div className="h-16 w-16 rounded-full border-2 border-primary flex items-center justify-center animate-pulse-ring">
+                    <Users className="h-7 w-7 text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground uppercase tracking-widest">Awaiting input signal</p>
+                  <p className="text-xs text-muted-foreground/70 max-w-md">
+                    Detects people and animals in real time. Tap "Identify species" to classify any detected animal via the cloud AI.
+                  </p>
+                </>
+              )}
+            </div>
           )}
-        />
 
-        {mode === "camera" && (
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-b from-primary to-transparent animate-scan" />
-        )}
+          <video ref={videoRef} className="hidden" playsInline muted />
+          <canvas
+            ref={canvasRef}
+            className={cn(
+              "absolute inset-0 w-full h-full object-contain transition-opacity duration-300",
+              mode === "idle" ? "opacity-0" : "opacity-100",
+            )}
+          />
 
-        <div className="absolute bottom-0 inset-x-0 bg-background/80 backdrop-blur border-t border-border px-4 py-2 flex items-center justify-between text-xs uppercase tracking-widest">
+          {mode === "camera" && (
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-gradient-to-b from-primary to-transparent animate-scan" />
+          )}
+
+          <div className="absolute bottom-0 inset-x-0 bg-background/80 backdrop-blur border-t border-border px-4 py-2 flex items-center justify-between text-xs uppercase tracking-widest">
+            <span className="flex items-center gap-2">
+              <span className={cn("h-1.5 w-1.5 rounded-full", mode === "camera" ? "bg-destructive animate-pulse" : "bg-primary")} />
+              <span className="text-muted-foreground">{status}</span>
+            </span>
+            <span className="text-muted-foreground/60 hidden sm:block">TF.JS · LOVABLE AI</span>
+          </div>
+        </div>
+      )}
+
+      {mode === "image" && (
+        <div className="border border-border bg-background/60 backdrop-blur px-4 py-2 flex items-center justify-between text-xs uppercase tracking-widest">
           <span className="flex items-center gap-2">
-            <span className={cn("h-1.5 w-1.5 rounded-full", mode === "camera" ? "bg-destructive animate-pulse" : "bg-primary")} />
+            <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             <span className="text-muted-foreground">{status}</span>
           </span>
           <span className="text-muted-foreground/60 hidden sm:block">TF.JS · LOVABLE AI</span>
         </div>
-      </div>
+      )}
 
       {/* Controls */}
       <div className="mt-4 flex flex-wrap gap-3 justify-center">
