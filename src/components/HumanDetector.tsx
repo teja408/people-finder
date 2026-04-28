@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
-import "@tensorflow/tfjs";
+import * as tf from "@tensorflow/tfjs";
 import { Button } from "@/components/ui/button";
 import { Boxes, Camera, Image as ImageIcon, Loader2, Sparkles, Square, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,14 @@ const ANIMAL_CLASSES = new Set([
   "elephant", "bear", "zebra", "giraffe", "bird",
 ]);
 
+const MAX_BOXES = 80;
+const PERSON_ANIMAL_MIN_SCORE = 0.24;
+const OBJECT_MIN_SCORE = 0.35;
+const IMAGE_MAX_SIDE = 1600;
+const CAMERA_MEMORY_MS = 850;
+
+type DetectSource = HTMLCanvasElement | HTMLImageElement | HTMLVideoElement | ImageData;
+
 type Detection = cocoSsd.DetectedObject & { kind: "person" | "animal" };
 
 type SpeciesResult = {
@@ -21,6 +29,35 @@ type SpeciesResult = {
   scientific_name: string | null;
   confidence: number;
   facts: string[];
+};
+
+const isPersonOrAnimal = (p: cocoSsd.DetectedObject) =>
+  p.class === "person" || ANIMAL_CLASSES.has(p.class);
+
+const filterDetections = (preds: cocoSsd.DetectedObject[]) =>
+  preds.filter((p) => p.score >= (isPersonOrAnimal(p) ? PERSON_ANIMAL_MIN_SCORE : OBJECT_MIN_SCORE));
+
+const iou = (a: number[], b: number[]) => {
+  const [ax, ay, aw, ah] = a;
+  const [bx, by, bw, bh] = b;
+  const x1 = Math.max(ax, bx);
+  const y1 = Math.max(ay, by);
+  const x2 = Math.min(ax + aw, bx + bw);
+  const y2 = Math.min(ay + ah, by + bh);
+  const intersection = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  const union = aw * ah + bw * bh - intersection;
+  return union > 0 ? intersection / union : 0;
+};
+
+const suppressDuplicateDetections = (preds: cocoSsd.DetectedObject[]) => {
+  const kept: cocoSsd.DetectedObject[] = [];
+  [...preds]
+    .sort((a, b) => b.score - a.score)
+    .forEach((p) => {
+      const duplicate = kept.some((k) => k.class === p.class && iou(k.bbox, p.bbox) > 0.45);
+      if (!duplicate) kept.push(p);
+    });
+  return kept;
 };
 
 export const HumanDetector = () => {
@@ -42,23 +79,57 @@ export const HumanDetector = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastPriorityPredsRef = useRef<cocoSsd.DetectedObject[]>([]);
+  const lastPriorityTimeRef = useRef(0);
+  const detectingRef = useRef(false);
+  const cameraRunRef = useRef(0);
 
   useEffect(() => {
-    // Use full mobilenet_v2 for higher accuracy (vs lite_mobilenet_v2)
-    cocoSsd.load({ base: "mobilenet_v2" })
-      .then((m) => {
+    const loadModel = async () => {
+      try {
+        await tf.ready();
+        try {
+          await tf.setBackend("webgl");
+          await tf.ready();
+        } catch (backendErr) {
+          console.warn("WebGL backend unavailable, using fallback backend:", backendErr);
+        }
+        // Use full mobilenet_v2 for higher accuracy (vs lite_mobilenet_v2)
+        const m = await cocoSsd.load({ base: "mobilenet_v2" });
         setModel(m);
         setLoading(false);
         setStatus("Ready. Upload an image or start the webcam.");
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Model load failed:", err);
         setStatus("Model failed to load. Please refresh.");
         toast.error("Failed to load detection model");
-      });
+      }
+    };
+    loadModel();
     return () => stopAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const detectAccurately = useCallback(
+    async (source: DetectSource, useMemory = false) => {
+      if (!model) return [] as cocoSsd.DetectedObject[];
+      const rawPreds = await model.detect(source, MAX_BOXES, PERSON_ANIMAL_MIN_SCORE);
+      let preds = suppressDuplicateDetections(filterDetections(rawPreds));
+
+      if (useMemory) {
+        const now = performance.now();
+        const priorityPreds = preds.filter(isPersonOrAnimal);
+        if (priorityPreds.length > 0) {
+          lastPriorityPredsRef.current = priorityPreds;
+          lastPriorityTimeRef.current = now;
+        } else if (now - lastPriorityTimeRef.current < CAMERA_MEMORY_MS) {
+          preds = suppressDuplicateDetections([...lastPriorityPredsRef.current, ...preds]);
+        }
+      }
+
+      return preds;
+    },
+    [model],
+  );
 
   const drawDetections = useCallback(
     (preds: cocoSsd.DetectedObject[], sourceW: number, sourceH: number, drawSource: CanvasImageSource) => {
@@ -127,8 +198,12 @@ export const HumanDetector = () => {
   );
 
   const stopAll = () => {
+    cameraRunRef.current += 1;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
+    detectingRef.current = false;
+    lastPriorityPredsRef.current = [];
+    lastPriorityTimeRef.current = 0;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -146,32 +221,54 @@ export const HumanDetector = () => {
     setStatus("Requesting webcam...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720, facingMode: "user" },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "environment",
+        },
       });
       streamRef.current = stream;
       const v = videoRef.current!;
       v.srcObject = stream;
       await v.play();
       setStatus("Detecting · LIVE");
+      const runId = cameraRunRef.current;
 
       const loop = async () => {
-        if (!videoRef.current || !model) return;
-        // Higher box budget + lower threshold for everyday objects (books, pens, cups, etc.)
-        const preds = await model.detect(videoRef.current, 40, 0.35);
-        const { persons, animals: a, objects } = drawDetections(
-          preds, videoRef.current.videoWidth, videoRef.current.videoHeight, videoRef.current,
-        );
-        setPersonCount(persons);
-        setAnimalCount(a.length);
-        setObjectCount(objects);
-        setAnimals(a);
-        // cache the latest video frame for cropping
-        const sc = sourceCanvasRef.current ?? document.createElement("canvas");
-        sc.width = videoRef.current.videoWidth;
-        sc.height = videoRef.current.videoHeight;
-        sc.getContext("2d")!.drawImage(videoRef.current, 0, 0);
-        sourceCanvasRef.current = sc;
-        rafRef.current = requestAnimationFrame(loop);
+        if (cameraRunRef.current !== runId) return;
+        if (!videoRef.current || !model || detectingRef.current) {
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        const video = videoRef.current;
+        if (!video.videoWidth || !video.videoHeight) {
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        detectingRef.current = true;
+        try {
+          const preds = await detectAccurately(video, true);
+          const { persons, animals: a, objects } = drawDetections(
+            preds, video.videoWidth, video.videoHeight, video,
+          );
+          setPersonCount(persons);
+          setAnimalCount(a.length);
+          setObjectCount(objects);
+          setAnimals(a);
+          // cache the latest video frame for cropping
+          const sc = sourceCanvasRef.current ?? document.createElement("canvas");
+          sc.width = video.videoWidth;
+          sc.height = video.videoHeight;
+          sc.getContext("2d")!.drawImage(video, 0, 0);
+          sourceCanvasRef.current = sc;
+        } catch (err) {
+          console.error("Live detection failed:", err);
+        } finally {
+          detectingRef.current = false;
+          if (cameraRunRef.current === runId) {
+            rafRef.current = requestAnimationFrame(loop);
+          }
+        }
       };
       loop();
     } catch {
@@ -210,6 +307,7 @@ export const HumanDetector = () => {
 
     const url = URL.createObjectURL(file);
     const img = new Image();
+    img.decoding = "async";
     img.onerror = () => {
       toast.error("Could not load that image");
       setStatus("Image failed to load.");
@@ -217,9 +315,9 @@ export const HumanDetector = () => {
     };
     img.onload = async () => {
       try {
-        // Resize source for stable detection (max 1024 wide)
-        const maxW = 1024;
-        const scale = img.width > maxW ? maxW / img.width : 1;
+        // Keep more detail for small people/animals while capping very large photos.
+        const longestSide = Math.max(img.width, img.height);
+        const scale = longestSide > IMAGE_MAX_SIDE ? IMAGE_MAX_SIDE / longestSide : 1;
         const w = Math.max(1, Math.round(img.width * scale));
         const h = Math.max(1, Math.round(img.height * scale));
         const tmp = document.createElement("canvas");
@@ -243,8 +341,8 @@ export const HumanDetector = () => {
           throw new Error("Canvas not available");
         }
 
-        // Run detection with higher box budget for better recall
-        const preds = await model.detect(tmp, 40, 0.35);
+        // Run with a lower threshold for people/animals, then filter objects separately.
+        const preds = await detectAccurately(tmp);
         const { persons, animals: a, objects } = drawDetections(preds, w, h, tmp);
         setPersonCount(persons);
         setAnimalCount(a.length);
