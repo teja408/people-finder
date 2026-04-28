@@ -44,11 +44,18 @@ export const HumanDetector = () => {
   const streamRef = useRef<MediaStream | null>(null);
 
   useEffect(() => {
-    cocoSsd.load({ base: "lite_mobilenet_v2" }).then((m) => {
-      setModel(m);
-      setLoading(false);
-      setStatus("Ready. Upload an image or start the webcam.");
-    });
+    // Use full mobilenet_v2 for higher accuracy (vs lite_mobilenet_v2)
+    cocoSsd.load({ base: "mobilenet_v2" })
+      .then((m) => {
+        setModel(m);
+        setLoading(false);
+        setStatus("Ready. Upload an image or start the webcam.");
+      })
+      .catch((err) => {
+        console.error("Model load failed:", err);
+        setStatus("Model failed to load. Please refresh.");
+        toast.error("Failed to load detection model");
+      });
     return () => stopAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
