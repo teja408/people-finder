@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import "@tensorflow/tfjs";
 import { Button } from "@/components/ui/button";
-import { Camera, Image as ImageIcon, Loader2, Sparkles, Square, Upload, Users } from "lucide-react";
+import { Boxes, Camera, Image as ImageIcon, Loader2, Sparkles, Square, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ export const HumanDetector = () => {
   const [mode, setMode] = useState<Mode>("idle");
   const [personCount, setPersonCount] = useState(0);
   const [animalCount, setAnimalCount] = useState(0);
+  const [objectCount, setObjectCount] = useState(0);
   const [status, setStatus] = useState("Initializing model...");
   const [animals, setAnimals] = useState<Detection[]>([]);
   const [classifying, setClassifying] = useState<number | null>(null);
@@ -55,17 +56,20 @@ export const HumanDetector = () => {
   const drawDetections = useCallback(
     (preds: cocoSsd.DetectedObject[], sourceW: number, sourceH: number, drawSource: CanvasImageSource) => {
       const canvas = canvasRef.current;
-      if (!canvas) return { persons: 0, animals: [] as Detection[] };
+      if (!canvas) return { persons: 0, animals: [] as Detection[], objects: 0 };
       canvas.width = sourceW;
       canvas.height = sourceH;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return { persons: 0, animals: [] as Detection[] };
+      if (!ctx) return { persons: 0, animals: [] as Detection[], objects: 0 };
       ctx.drawImage(drawSource, 0, 0, sourceW, sourceH);
 
       const persons = preds.filter((p) => p.class === "person");
       const animalsList: Detection[] = preds
         .filter((p) => ANIMAL_CLASSES.has(p.class))
         .map((p) => ({ ...p, kind: "animal" as const }));
+      const objectsList = preds.filter(
+        (p) => p.class !== "person" && !ANIMAL_CLASSES.has(p.class),
+      );
 
       ctx.lineWidth = Math.max(2, sourceW / 400);
       ctx.font = `${Math.max(14, sourceW / 50)}px "JetBrains Mono", monospace`;
@@ -105,8 +109,12 @@ export const HumanDetector = () => {
         drawBox(p, i, "hsl(35, 100%, 55%)", "hsl(50, 100%, 60%)",
           `${p.class.toUpperCase()} ${i + 1} · ${Math.round(p.score * 100)}%`),
       );
+      objectsList.forEach((p, i) =>
+        drawBox(p, i, "hsl(280, 100%, 65%)", "hsl(320, 100%, 70%)",
+          `${p.class.toUpperCase()} ${i + 1} · ${Math.round(p.score * 100)}%`),
+      );
 
-      return { persons: persons.length, animals: animalsList };
+      return { persons: persons.length, animals: animalsList, objects: objectsList.length };
     },
     [],
   );
