@@ -10,7 +10,8 @@ Deno.serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
 
-    const { image, hint } = await req.json();
+    const body = await req.json();
+    const { image, hint, mode } = body ?? {};
     if (!image || typeof image !== "string") {
       return new Response(JSON.stringify({ error: "Missing 'image' (data URL)" }), {
         status: 400,
@@ -18,17 +19,40 @@ Deno.serve(async (req) => {
       });
     }
 
-    const prompt = `You are a wildlife & pet identification expert. Identify the animal in this cropped image.${
-      hint ? ` Coarse class hint from object detector: "${hint}".` : ""
+    // Two modes:
+    //  - "scene"  → list ALL animals/objects/people Gemini sees in the full image
+    //  - default  → identify the single subject in a cropped image (any animal OR object)
+    const isScene = mode === "scene";
+
+    const prompt = isScene
+      ? `You are a precise visual recognition expert. Identify EVERY distinct subject visible in this image (animals of any species, people, and notable objects/things — including items COCO-SSD cannot detect like specific animal species, tools, plants, devices, etc.).
+
+Return STRICT JSON with this exact shape and no extra text:
+{
+  "summary": "one short sentence describing the scene",
+  "subjects": [
+    {
+      "name": "specific common name (e.g. 'Bengal Tiger', 'Red Fox', 'iPhone', 'Acoustic Guitar')",
+      "category": "animal" | "person" | "object" | "plant" | "vehicle" | "food" | "other",
+      "scientific_name": "Latin binomial if animal/plant, else null",
+      "count": integer (how many of this subject are visible),
+      "confidence": 0-100 integer,
+      "facts": ["short fact 1", "short fact 2"]
     }
+  ]
+}
+Be specific — prefer "Golden Retriever" over "dog", "Honeybee" over "insect".`
+      : `You are an expert at identifying animals, objects, and things in images. Identify the MAIN subject in this cropped image — it could be any animal species, a person, or any object/item.${
+          hint ? ` Coarse class hint from object detector: "${hint}".` : ""
+        }
 Return STRICT JSON with this shape and no extra text:
 {
-  "species": "common name (e.g. 'Golden Retriever', 'African Elephant')",
-  "scientific_name": "Latin binomial or null",
+  "species": "specific common name (e.g. 'Bengal Tiger', 'Golden Retriever', 'Acoustic Guitar', 'iPhone 15')",
+  "scientific_name": "Latin binomial if it's an animal or plant, else null",
   "confidence": 0-100 integer,
   "facts": ["short fact 1", "short fact 2", "short fact 3"]
 }
-If it is not an animal, set species to "Not an animal" and confidence 0.`;
+Be as specific as possible (exact breed/species/model). If you genuinely cannot identify it, set species to "Unknown" and confidence 0.`;
 
     const aiRes = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
