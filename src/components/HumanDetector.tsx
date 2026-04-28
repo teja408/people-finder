@@ -94,6 +94,7 @@ export const HumanDetector = () => {
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const aiCanvasRef = useRef<HTMLCanvasElement>(null);
   const sourceCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number | null>(null);
