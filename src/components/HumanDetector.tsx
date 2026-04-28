@@ -689,7 +689,7 @@ export const HumanDetector = () => {
             className="gap-2 uppercase tracking-widest bg-gradient-to-r from-primary to-accent text-primary-foreground border border-primary shadow-neon hover:opacity-90"
           >
             {sceneLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
-            Identify Everything with AI
+            Identify with AI
           </Button>
         )}
       </div>
