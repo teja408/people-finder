@@ -200,6 +200,9 @@ export const HumanDetector = () => {
   const stopAll = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
+    detectingRef.current = false;
+    lastPriorityPredsRef.current = [];
+    lastPriorityTimeRef.current = 0;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -217,7 +220,11 @@ export const HumanDetector = () => {
     setStatus("Requesting webcam...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: 1280, height: 720, facingMode: "user" },
+        video: {
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          facingMode: "environment",
+        },
       });
       streamRef.current = stream;
       const v = videoRef.current!;
@@ -226,23 +233,37 @@ export const HumanDetector = () => {
       setStatus("Detecting · LIVE");
 
       const loop = async () => {
-        if (!videoRef.current || !model) return;
-        // Higher box budget + lower threshold for everyday objects (books, pens, cups, etc.)
-        const preds = await model.detect(videoRef.current, 40, 0.35);
-        const { persons, animals: a, objects } = drawDetections(
-          preds, videoRef.current.videoWidth, videoRef.current.videoHeight, videoRef.current,
-        );
-        setPersonCount(persons);
-        setAnimalCount(a.length);
-        setObjectCount(objects);
-        setAnimals(a);
-        // cache the latest video frame for cropping
-        const sc = sourceCanvasRef.current ?? document.createElement("canvas");
-        sc.width = videoRef.current.videoWidth;
-        sc.height = videoRef.current.videoHeight;
-        sc.getContext("2d")!.drawImage(videoRef.current, 0, 0);
-        sourceCanvasRef.current = sc;
-        rafRef.current = requestAnimationFrame(loop);
+        if (!videoRef.current || !model || detectingRef.current) {
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        const video = videoRef.current;
+        if (!video.videoWidth || !video.videoHeight) {
+          rafRef.current = requestAnimationFrame(loop);
+          return;
+        }
+        detectingRef.current = true;
+        try {
+          const preds = await detectAccurately(video, true);
+          const { persons, animals: a, objects } = drawDetections(
+            preds, video.videoWidth, video.videoHeight, video,
+          );
+          setPersonCount(persons);
+          setAnimalCount(a.length);
+          setObjectCount(objects);
+          setAnimals(a);
+          // cache the latest video frame for cropping
+          const sc = sourceCanvasRef.current ?? document.createElement("canvas");
+          sc.width = video.videoWidth;
+          sc.height = video.videoHeight;
+          sc.getContext("2d")!.drawImage(video, 0, 0);
+          sourceCanvasRef.current = sc;
+        } catch (err) {
+          console.error("Live detection failed:", err);
+        } finally {
+          detectingRef.current = false;
+          rafRef.current = requestAnimationFrame(loop);
+        }
       };
       loop();
     } catch {
