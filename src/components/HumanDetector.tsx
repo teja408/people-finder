@@ -304,6 +304,7 @@ export const HumanDetector = () => {
     setAnimals([]);
     setSpecies({});
     setOriginalImage(null);
+    setScene(null);
     const c = canvasRef.current;
     if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
   };
