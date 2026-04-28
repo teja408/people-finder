@@ -156,7 +156,8 @@ export const HumanDetector = () => {
 
       const loop = async () => {
         if (!videoRef.current || !model) return;
-        const preds = await model.detect(videoRef.current);
+        // Higher box budget + lower threshold for everyday objects (books, pens, cups, etc.)
+        const preds = await model.detect(videoRef.current, 40, 0.35);
         const { persons, animals: a, objects } = drawDetections(
           preds, videoRef.current.videoWidth, videoRef.current.videoHeight, videoRef.current,
         );
