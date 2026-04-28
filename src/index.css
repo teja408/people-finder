@@ -109,5 +109,32 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    background-image: var(--gradient-hero);
+    background-attachment: fixed;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+  }
+}
+
+@layer utilities {
+  .text-glow {
+    text-shadow: 0 0 20px hsl(var(--neon) / 0.6), 0 0 40px hsl(var(--neon) / 0.3);
+  }
+  .shadow-neon {
+    box-shadow: var(--shadow-neon);
+  }
+  .grid-bg {
+    background-image:
+      linear-gradient(hsl(var(--grid) / 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--grid) / 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+  .scanline::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 0%, hsl(var(--neon) / 0.06) 50%, transparent 100%);
+    background-size: 100% 8px;
+    pointer-events: none;
+    mix-blend-mode: screen;
   }
 }
