@@ -31,6 +31,20 @@ type SpeciesResult = {
   facts: string[];
 };
 
+type SceneSubject = {
+  name: string;
+  category: "animal" | "person" | "object" | "plant" | "vehicle" | "food" | "other";
+  scientific_name: string | null;
+  count: number;
+  confidence: number;
+  facts: string[];
+};
+
+type SceneResult = {
+  summary: string;
+  subjects: SceneSubject[];
+};
+
 const isPersonOrAnimal = (p: cocoSsd.DetectedObject) =>
   p.class === "person" || ANIMAL_CLASSES.has(p.class);
 
