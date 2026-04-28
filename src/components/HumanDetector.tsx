@@ -106,7 +106,6 @@ export const HumanDetector = () => {
     };
     loadModel();
     return () => stopAll();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const detectAccurately = useCallback(
