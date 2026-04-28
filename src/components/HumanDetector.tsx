@@ -150,11 +150,12 @@ export const HumanDetector = () => {
       const loop = async () => {
         if (!videoRef.current || !model) return;
         const preds = await model.detect(videoRef.current);
-        const { persons, animals: a } = drawDetections(
+        const { persons, animals: a, objects } = drawDetections(
           preds, videoRef.current.videoWidth, videoRef.current.videoHeight, videoRef.current,
         );
         setPersonCount(persons);
         setAnimalCount(a.length);
+        setObjectCount(objects);
         setAnimals(a);
         // cache the latest video frame for cropping
         const sc = sourceCanvasRef.current ?? document.createElement("canvas");
@@ -177,6 +178,7 @@ export const HumanDetector = () => {
     setStatus("Stopped. Ready when you are.");
     setPersonCount(0);
     setAnimalCount(0);
+    setObjectCount(0);
     setAnimals([]);
     setSpecies({});
     setOriginalImage(null);
@@ -204,11 +206,12 @@ export const HumanDetector = () => {
       sourceCanvasRef.current = tmp;
       setOriginalImage(tmp.toDataURL("image/jpeg", 0.9));
       const preds = await model.detect(tmp);
-      const { persons, animals: a } = drawDetections(preds, w, h, tmp);
+      const { persons, animals: a, objects } = drawDetections(preds, w, h, tmp);
       setPersonCount(persons);
       setAnimalCount(a.length);
+      setObjectCount(objects);
       setAnimals(a);
-      setStatus(`Detection complete · ${persons} people · ${a.length} animals`);
+      setStatus(`Detection complete · ${persons} people · ${a.length} animals · ${objects} objects`);
       URL.revokeObjectURL(url);
     };
     img.src = url;
