@@ -33,6 +33,7 @@ export const HumanDetector = () => {
   const [animals, setAnimals] = useState<Detection[]>([]);
   const [classifying, setClassifying] = useState<number | null>(null);
   const [species, setSpecies] = useState<Record<number, SpeciesResult>>({});
+  const [originalImage, setOriginalImage] = useState<string | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
