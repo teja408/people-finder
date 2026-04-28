@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
-import "@tensorflow/tfjs";
+import * as tf from "@tensorflow/tfjs";
 import { Button } from "@/components/ui/button";
 import { Boxes, Camera, Image as ImageIcon, Loader2, Sparkles, Square, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -14,6 +14,14 @@ const ANIMAL_CLASSES = new Set([
   "elephant", "bear", "zebra", "giraffe", "bird",
 ]);
 
+const MAX_BOXES = 80;
+const PERSON_ANIMAL_MIN_SCORE = 0.24;
+const OBJECT_MIN_SCORE = 0.35;
+const IMAGE_MAX_SIDE = 1600;
+const CAMERA_MEMORY_MS = 850;
+
+type DetectSource = HTMLCanvasElement | HTMLImageElement | HTMLVideoElement | ImageData;
+
 type Detection = cocoSsd.DetectedObject & { kind: "person" | "animal" };
 
 type SpeciesResult = {
@@ -21,6 +29,35 @@ type SpeciesResult = {
   scientific_name: string | null;
   confidence: number;
   facts: string[];
+};
+
+const isPersonOrAnimal = (p: cocoSsd.DetectedObject) =>
+  p.class === "person" || ANIMAL_CLASSES.has(p.class);
+
+const filterDetections = (preds: cocoSsd.DetectedObject[]) =>
+  preds.filter((p) => p.score >= (isPersonOrAnimal(p) ? PERSON_ANIMAL_MIN_SCORE : OBJECT_MIN_SCORE));
+
+const iou = (a: number[], b: number[]) => {
+  const [ax, ay, aw, ah] = a;
+  const [bx, by, bw, bh] = b;
+  const x1 = Math.max(ax, bx);
+  const y1 = Math.max(ay, by);
+  const x2 = Math.min(ax + aw, bx + bw);
+  const y2 = Math.min(ay + ah, by + bh);
+  const intersection = Math.max(0, x2 - x1) * Math.max(0, y2 - y1);
+  const union = aw * ah + bw * bh - intersection;
+  return union > 0 ? intersection / union : 0;
+};
+
+const suppressDuplicateDetections = (preds: cocoSsd.DetectedObject[]) => {
+  const kept: cocoSsd.DetectedObject[] = [];
+  [...preds]
+    .sort((a, b) => b.score - a.score)
+    .forEach((p) => {
+      const duplicate = kept.some((k) => k.class === p.class && iou(k.bbox, p.bbox) > 0.45);
+      if (!duplicate) kept.push(p);
+    });
+  return kept;
 };
 
 export const HumanDetector = () => {
