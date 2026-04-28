@@ -311,7 +311,7 @@ export const HumanDetector = () => {
                 <Sparkles className="h-3 w-3" />
                 Model Predicted
               </span>
-              <span className="text-muted-foreground">{personCount}P · {animalCount}A</span>
+              <span className="text-muted-foreground">{personCount}P · {animalCount}A · {objectCount}O</span>
             </figcaption>
           </figure>
         </div>
