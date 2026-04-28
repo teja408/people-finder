@@ -9,7 +9,7 @@ const Index = () => {
           Live Vision System
         </div>
         <h1 className="text-4xl sm:text-6xl font-bold text-foreground">
-          Human <span className="text-primary text-glow">Detector</span>
+          <span className="text-primary text-glow">Detection</span>
         </h1>
         <p className="mt-4 text-sm sm:text-base text-muted-foreground max-w-xl mx-auto">
           Real-time person detection running 100% in your browser. Powered by TensorFlow.js and the COCO-SSD neural network.
