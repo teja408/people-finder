@@ -505,7 +505,17 @@ export const HumanDetector = () => {
       if (data?.error) throw new Error(data.error);
       const result = data?.result as SceneResult | null;
       if (!result || !Array.isArray(result.subjects)) throw new Error("Empty response");
-      setScene(result);
+
+      // Safety filter: only keep person/animal/object, drop scenery & accessories
+      const BLOCKLIST = /\b(grass|sky|cloud|tree|bush|leaf|leaves|mountain|hill|water|sea|ocean|river|lake|sand|beach|road|street|floor|wall|ceiling|ground|dirt|rock|stone|shadow|reflection|ring|necklace|earring|bracelet|jewelry|jewellery|hat|cap|shirt|pants|trousers|jacket|coat|dress|shoe|sneaker|boot|belt|glasses|sunglasses|watch strap|hair|hand|face|eye|skin|background|wallpaper|curtain|carpet|rug)\b/i;
+      const ALLOWED = new Set(["person", "animal", "object"]);
+      const filtered: SceneResult = {
+        summary: result.summary,
+        subjects: result.subjects.filter(
+          (s) => ALLOWED.has(s.category) && !BLOCKLIST.test(s.name),
+        ),
+      };
+      setScene(filtered);
       // Wait for the AI canvas to mount, then draw
       for (let i = 0; i < 30; i++) {
         if (aiCanvasRef.current) break;
