@@ -424,7 +424,30 @@ export const HumanDetector = () => {
     }
   };
 
-  return (
+  const identifyScene = async () => {
+    if (!originalImage) {
+      toast.error("Upload an image first.");
+      return;
+    }
+    setSceneLoading(true);
+    setScene(null);
+    try {
+      const { data, error } = await supabase.functions.invoke("classify-animal", {
+        body: { image: originalImage, mode: "scene" },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      const result = data?.result as SceneResult | null;
+      if (!result || !Array.isArray(result.subjects)) throw new Error("Empty response");
+      setScene(result);
+      toast.success(`AI identified ${result.subjects.length} subject(s)`);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "AI identification failed";
+      toast.error(msg);
+    } finally {
+      setSceneLoading(false);
+    }
+  };
     <div className="w-full max-w-6xl mx-auto">
       {/* HUD top bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4 text-xs uppercase tracking-widest">
