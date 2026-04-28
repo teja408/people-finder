@@ -267,8 +267,12 @@ export const HumanDetector = () => {
           size="lg"
           disabled={mode === "idle"}
           onClick={handleStop}
-          variant="outline"
-          className="gap-2 uppercase tracking-widest"
+          variant={mode !== "idle" ? "destructive" : "outline"}
+          className={cn(
+            "gap-2 uppercase tracking-widest transition-all",
+            mode !== "idle" &&
+              "bg-destructive text-destructive-foreground border border-destructive shadow-[0_0_24px_hsl(var(--destructive)/0.6)] hover:bg-destructive/90 animate-pulse-ring",
+          )}
         >
           <Square className="h-4 w-4" />
           Stop
