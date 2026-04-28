@@ -598,7 +598,54 @@ export const HumanDetector = () => {
         >
           <Square className="h-4 w-4" /> Stop
         </Button>
+        {mode === "image" && originalImage && (
+          <Button
+            size="lg"
+            onClick={identifyScene}
+            disabled={sceneLoading}
+            className="gap-2 uppercase tracking-widest bg-gradient-to-r from-primary to-accent text-primary-foreground border border-primary shadow-neon hover:opacity-90"
+          >
+            {sceneLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+            Identify Everything with AI
+          </Button>
+        )}
       </div>
+
+      {/* Full-scene AI identification (any animal/object, including those COCO-SSD can't see) */}
+      {scene && (
+        <div className="mt-6 border border-primary/40 bg-card/60 backdrop-blur p-4 shadow-neon">
+          <h3 className="text-xs uppercase tracking-widest text-primary text-glow mb-2 flex items-center gap-2">
+            <Sparkles className="h-3.5 w-3.5" />
+            AI Scene Analysis
+          </h3>
+          {scene.summary && (
+            <p className="text-sm text-muted-foreground mb-4 italic">"{scene.summary}"</p>
+          )}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {scene.subjects.map((s, i) => (
+              <div key={i} className="border border-border bg-background/40 p-3 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold text-foreground">
+                    {s.name}
+                    {s.count > 1 && <span className="text-muted-foreground"> ×{s.count}</span>}
+                  </span>
+                  <span className="text-[10px] uppercase tracking-widest px-2 py-0.5 border border-border text-muted-foreground">
+                    {s.category} · {s.confidence}%
+                  </span>
+                </div>
+                {s.scientific_name && (
+                  <div className="text-xs text-muted-foreground italic">{s.scientific_name}</div>
+                )}
+                {s.facts?.length > 0 && (
+                  <ul className="list-disc list-inside text-xs text-muted-foreground/80 space-y-0.5 pt-1">
+                    {s.facts.slice(0, 2).map((f, j) => <li key={j}>{f}</li>)}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Animals panel */}
       {animals.length > 0 && (
