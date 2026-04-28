@@ -82,6 +82,7 @@ export const HumanDetector = () => {
   const lastPriorityPredsRef = useRef<cocoSsd.DetectedObject[]>([]);
   const lastPriorityTimeRef = useRef(0);
   const detectingRef = useRef(false);
+  const cameraRunRef = useRef(0);
 
   useEffect(() => {
     const loadModel = async () => {
@@ -197,6 +198,7 @@ export const HumanDetector = () => {
   );
 
   const stopAll = () => {
+    cameraRunRef.current += 1;
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
     detectingRef.current = false;
@@ -230,8 +232,10 @@ export const HumanDetector = () => {
       v.srcObject = stream;
       await v.play();
       setStatus("Detecting · LIVE");
+      const runId = cameraRunRef.current;
 
       const loop = async () => {
+        if (cameraRunRef.current !== runId) return;
         if (!videoRef.current || !model || detectingRef.current) {
           rafRef.current = requestAnimationFrame(loop);
           return;
@@ -261,7 +265,9 @@ export const HumanDetector = () => {
           console.error("Live detection failed:", err);
         } finally {
           detectingRef.current = false;
-          rafRef.current = requestAnimationFrame(loop);
+          if (cameraRunRef.current === runId) {
+            rafRef.current = requestAnimationFrame(loop);
+          }
         }
       };
       loop();
