@@ -428,6 +428,68 @@ export const HumanDetector = () => {
     }
   };
 
+  const categoryColor = (cat: SceneSubject["category"]) => {
+    switch (cat) {
+      case "person": return { stroke: "hsl(158, 100%, 52%)", accent: "hsl(195, 100%, 55%)" };
+      case "animal": return { stroke: "hsl(35, 100%, 55%)", accent: "hsl(50, 100%, 60%)" };
+      case "vehicle": return { stroke: "hsl(200, 100%, 60%)", accent: "hsl(220, 100%, 70%)" };
+      case "plant": return { stroke: "hsl(120, 80%, 55%)", accent: "hsl(140, 80%, 60%)" };
+      case "food": return { stroke: "hsl(0, 100%, 65%)", accent: "hsl(20, 100%, 70%)" };
+      default: return { stroke: "hsl(280, 100%, 65%)", accent: "hsl(320, 100%, 70%)" };
+    }
+  };
+
+  const drawSceneOverlay = useCallback((result: SceneResult) => {
+    const src = sourceCanvasRef.current;
+    const canvas = aiCanvasRef.current;
+    if (!src || !canvas) return;
+    const W = src.width, H = src.height;
+    canvas.width = W;
+    canvas.height = H;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(src, 0, 0, W, H);
+    ctx.lineWidth = Math.max(2, W / 400);
+    ctx.font = `${Math.max(14, W / 50)}px "JetBrains Mono", monospace`;
+
+    result.subjects.forEach((s) => {
+      const { stroke, accent } = categoryColor(s.category);
+      const boxes = s.boxes ?? [];
+      boxes.forEach((b, i) => {
+        const x = b.x_min * W;
+        const y = b.y_min * H;
+        const w = (b.x_max - b.x_min) * W;
+        const h = (b.y_max - b.y_min) * H;
+        if (w <= 0 || h <= 0) return;
+
+        ctx.strokeStyle = stroke;
+        ctx.shadowColor = stroke;
+        ctx.shadowBlur = 12;
+        ctx.strokeRect(x, y, w, h);
+        ctx.shadowBlur = 0;
+
+        const c = Math.min(20, w / 4, h / 4);
+        ctx.strokeStyle = accent;
+        ctx.beginPath();
+        ctx.moveTo(x, y + c); ctx.lineTo(x, y); ctx.lineTo(x + c, y);
+        ctx.moveTo(x + w - c, y); ctx.lineTo(x + w, y); ctx.lineTo(x + w, y + c);
+        ctx.moveTo(x + w, y + h - c); ctx.lineTo(x + w, y + h); ctx.lineTo(x + w, y + h - c);
+        ctx.moveTo(x + c, y + h); ctx.lineTo(x, y + h); ctx.lineTo(x, y + h - c);
+        ctx.stroke();
+
+        const label = boxes.length > 1
+          ? `${s.name.toUpperCase()} ${i + 1} · ${s.confidence}%`
+          : `${s.name.toUpperCase()} · ${s.confidence}%`;
+        const tw = ctx.measureText(label).width + 12;
+        const th = Math.max(20, W / 40);
+        ctx.fillStyle = stroke;
+        ctx.fillRect(x, Math.max(0, y - th), tw, th);
+        ctx.fillStyle = "hsl(230, 25%, 6%)";
+        ctx.fillText(label, x + 6, Math.max(th - 6, y - 6));
+      });
+    });
+  }, []);
+
   const identifyScene = async () => {
     if (!originalImage) {
       toast.error("Upload an image first.");
@@ -444,7 +506,14 @@ export const HumanDetector = () => {
       const result = data?.result as SceneResult | null;
       if (!result || !Array.isArray(result.subjects)) throw new Error("Empty response");
       setScene(result);
-      toast.success(`AI identified ${result.subjects.length} subject(s)`);
+      // Wait for the AI canvas to mount, then draw
+      for (let i = 0; i < 30; i++) {
+        if (aiCanvasRef.current) break;
+        await new Promise((r) => requestAnimationFrame(() => r(null)));
+      }
+      drawSceneOverlay(result);
+      const totalBoxes = result.subjects.reduce((n, s) => n + (s.boxes?.length ?? 0), 0);
+      toast.success(`AI identified ${result.subjects.length} subject(s) · ${totalBoxes} labels`);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "AI identification failed";
       toast.error(msg);
