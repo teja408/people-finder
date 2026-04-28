@@ -25,7 +25,18 @@ Deno.serve(async (req) => {
     const isScene = mode === "scene";
 
     const prompt = isScene
-      ? `You are a precise visual recognition expert. Identify EVERY distinct subject visible in this image — animals (any species), people, and notable objects/things (cars, books, pens, phones, cups, plants, tools, devices, etc.).
+      ? `You are a precise visual recognition expert. Identify ONLY the meaningful FOREGROUND subjects in this image. You are restricted to THREE categories:
+
+1. "person"  — humans
+2. "animal"  — any animal (dogs, cats, birds, insects, fish, wildlife, etc.)
+3. "object"  — discrete, useful man-made things people interact with (e.g. car, bicycle, book, pen, phone, laptop, cup, bottle, chair, bag, watch, guitar, ball, tool, appliance)
+
+STRICTLY EXCLUDE (do NOT label these — never return them):
+- Background / scenery: grass, sky, clouds, trees (as scenery), bushes, mountains, water, sand, road, floor, wall, ceiling, ground, dirt
+- Decorations / accessories that are not standalone usable items: rings, necklaces, earrings, bracelets, jewelry, hats, clothing, shoes, belts, glasses
+- Body parts: hands, faces, hair, eyes
+- Generic textures or surfaces: shadows, reflections, patterns
+- Food unless it's clearly a discrete prepared item (skip raw ingredients/garnishes)
 
 For EACH individual instance, return a tight bounding box in NORMALIZED coordinates (0.0 to 1.0) where:
 - x_min, y_min = top-left corner (0,0 is top-left of image)
@@ -36,9 +47,9 @@ Return STRICT JSON with this exact shape and no extra text:
   "summary": "one short sentence describing the scene",
   "subjects": [
     {
-      "name": "specific common name (e.g. 'Bengal Tiger', 'Red Fox', 'iPhone', 'Book', 'Pen', 'Car')",
-      "category": "animal" | "person" | "object" | "plant" | "vehicle" | "food" | "other",
-      "scientific_name": "Latin binomial if animal/plant, else null",
+      "name": "specific common name (e.g. 'Bengal Tiger', 'Golden Retriever', 'iPhone', 'Book', 'Pen', 'Car')",
+      "category": "person" | "animal" | "object",
+      "scientific_name": "Latin binomial if animal, else null",
       "count": integer (how many of this subject are visible),
       "confidence": 0-100 integer,
       "facts": ["short fact 1", "short fact 2"],
@@ -49,9 +60,10 @@ Return STRICT JSON with this exact shape and no extra text:
   ]
 }
 Rules:
-- The "boxes" array MUST contain one box per visible instance (length should equal "count").
-- Be specific — prefer "Golden Retriever" over "dog", "Honeybee" over "insect".
-- Include everyday objects like books, pens, phones, cups, cars even if small.`
+- ONLY use the three allowed categories: "person", "animal", "object". Never invent others.
+- The "boxes" array MUST contain one box per visible instance (length must equal "count").
+- Be specific for animals — prefer "Golden Retriever" over "dog".
+- If nothing in the allowed categories is visible, return { "summary": "...", "subjects": [] }.`
       : `You are an expert at identifying animals, objects, and things in images. Identify the MAIN subject in this cropped image — it could be any animal species, a person, or any object/item.${
           hint ? ` Coarse class hint from object detector: "${hint}".` : ""
         }
