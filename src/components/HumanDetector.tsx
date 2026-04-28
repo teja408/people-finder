@@ -694,6 +694,16 @@ export const HumanDetector = () => {
           {scene.summary && (
             <p className="text-sm text-muted-foreground mb-4 italic">"{scene.summary}"</p>
           )}
+          {/* AI-labeled image */}
+          <figure className="mb-4 border border-border bg-background/40 overflow-hidden corner-brackets">
+            <div className="aspect-video w-full bg-background/40 flex items-center justify-center overflow-hidden">
+              <canvas ref={aiCanvasRef} className="w-full h-full object-contain" />
+            </div>
+            <figcaption className="border-t border-border px-4 py-2 text-xs uppercase tracking-widest text-primary text-glow flex items-center gap-2">
+              <Sparkles className="h-3 w-3" />
+              AI labeled image
+            </figcaption>
+          </figure>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {scene.subjects.map((s, i) => (
               <div key={i} className="border border-border bg-background/40 p-3 flex flex-col gap-1.5">
