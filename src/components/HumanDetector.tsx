@@ -317,6 +317,7 @@ export const HumanDetector = () => {
     stopAll();
     setMode("image");
     setSpecies({});
+    setScene(null);
     setAnimals([]);
     setPersonCount(0);
     setAnimalCount(0);
