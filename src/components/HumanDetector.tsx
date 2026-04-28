@@ -79,23 +79,57 @@ export const HumanDetector = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const rafRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const lastPriorityPredsRef = useRef<cocoSsd.DetectedObject[]>([]);
+  const lastPriorityTimeRef = useRef(0);
+  const detectingRef = useRef(false);
 
   useEffect(() => {
-    // Use full mobilenet_v2 for higher accuracy (vs lite_mobilenet_v2)
-    cocoSsd.load({ base: "mobilenet_v2" })
-      .then((m) => {
+    const loadModel = async () => {
+      try {
+        await tf.ready();
+        try {
+          await tf.setBackend("webgl");
+          await tf.ready();
+        } catch (backendErr) {
+          console.warn("WebGL backend unavailable, using fallback backend:", backendErr);
+        }
+        // Use full mobilenet_v2 for higher accuracy (vs lite_mobilenet_v2)
+        const m = await cocoSsd.load({ base: "mobilenet_v2" });
         setModel(m);
         setLoading(false);
         setStatus("Ready. Upload an image or start the webcam.");
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Model load failed:", err);
         setStatus("Model failed to load. Please refresh.");
         toast.error("Failed to load detection model");
-      });
+      }
+    };
+    loadModel();
     return () => stopAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const detectAccurately = useCallback(
+    async (source: DetectSource, useMemory = false) => {
+      if (!model) return [] as cocoSsd.DetectedObject[];
+      const rawPreds = await model.detect(source, MAX_BOXES, PERSON_ANIMAL_MIN_SCORE);
+      let preds = suppressDuplicateDetections(filterDetections(rawPreds));
+
+      if (useMemory) {
+        const now = performance.now();
+        const priorityPreds = preds.filter(isPersonOrAnimal);
+        if (priorityPreds.length > 0) {
+          lastPriorityPredsRef.current = priorityPreds;
+          lastPriorityTimeRef.current = now;
+        } else if (now - lastPriorityTimeRef.current < CAMERA_MEMORY_MS) {
+          preds = suppressDuplicateDetections([...lastPriorityPredsRef.current, ...preds]);
+        }
+      }
+
+      return preds;
+    },
+    [model],
+  );
 
   const drawDetections = useCallback(
     (preds: cocoSsd.DetectedObject[], sourceW: number, sourceH: number, drawSource: CanvasImageSource) => {
