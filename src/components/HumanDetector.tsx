@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import * as cocoSsd from "@tensorflow-models/coco-ssd";
 import "@tensorflow/tfjs";
 import { Button } from "@/components/ui/button";
-import { Camera, Image as ImageIcon, Loader2, Sparkles, Square, Upload, Users } from "lucide-react";
+import { Boxes, Camera, Image as ImageIcon, Loader2, Sparkles, Square, Upload, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,6 +29,7 @@ export const HumanDetector = () => {
   const [mode, setMode] = useState<Mode>("idle");
   const [personCount, setPersonCount] = useState(0);
   const [animalCount, setAnimalCount] = useState(0);
+  const [objectCount, setObjectCount] = useState(0);
   const [status, setStatus] = useState("Initializing model...");
   const [animals, setAnimals] = useState<Detection[]>([]);
   const [classifying, setClassifying] = useState<number | null>(null);
@@ -55,17 +56,20 @@ export const HumanDetector = () => {
   const drawDetections = useCallback(
     (preds: cocoSsd.DetectedObject[], sourceW: number, sourceH: number, drawSource: CanvasImageSource) => {
       const canvas = canvasRef.current;
-      if (!canvas) return { persons: 0, animals: [] as Detection[] };
+      if (!canvas) return { persons: 0, animals: [] as Detection[], objects: 0 };
       canvas.width = sourceW;
       canvas.height = sourceH;
       const ctx = canvas.getContext("2d");
-      if (!ctx) return { persons: 0, animals: [] as Detection[] };
+      if (!ctx) return { persons: 0, animals: [] as Detection[], objects: 0 };
       ctx.drawImage(drawSource, 0, 0, sourceW, sourceH);
 
       const persons = preds.filter((p) => p.class === "person");
       const animalsList: Detection[] = preds
         .filter((p) => ANIMAL_CLASSES.has(p.class))
         .map((p) => ({ ...p, kind: "animal" as const }));
+      const objectsList = preds.filter(
+        (p) => p.class !== "person" && !ANIMAL_CLASSES.has(p.class),
+      );
 
       ctx.lineWidth = Math.max(2, sourceW / 400);
       ctx.font = `${Math.max(14, sourceW / 50)}px "JetBrains Mono", monospace`;
@@ -105,8 +109,12 @@ export const HumanDetector = () => {
         drawBox(p, i, "hsl(35, 100%, 55%)", "hsl(50, 100%, 60%)",
           `${p.class.toUpperCase()} ${i + 1} · ${Math.round(p.score * 100)}%`),
       );
+      objectsList.forEach((p, i) =>
+        drawBox(p, i, "hsl(280, 100%, 65%)", "hsl(320, 100%, 70%)",
+          `${p.class.toUpperCase()} ${i + 1} · ${Math.round(p.score * 100)}%`),
+      );
 
-      return { persons: persons.length, animals: animalsList };
+      return { persons: persons.length, animals: animalsList, objects: objectsList.length };
     },
     [],
   );
@@ -142,11 +150,12 @@ export const HumanDetector = () => {
       const loop = async () => {
         if (!videoRef.current || !model) return;
         const preds = await model.detect(videoRef.current);
-        const { persons, animals: a } = drawDetections(
+        const { persons, animals: a, objects } = drawDetections(
           preds, videoRef.current.videoWidth, videoRef.current.videoHeight, videoRef.current,
         );
         setPersonCount(persons);
         setAnimalCount(a.length);
+        setObjectCount(objects);
         setAnimals(a);
         // cache the latest video frame for cropping
         const sc = sourceCanvasRef.current ?? document.createElement("canvas");
@@ -169,6 +178,7 @@ export const HumanDetector = () => {
     setStatus("Stopped. Ready when you are.");
     setPersonCount(0);
     setAnimalCount(0);
+    setObjectCount(0);
     setAnimals([]);
     setSpecies({});
     setOriginalImage(null);
@@ -196,11 +206,12 @@ export const HumanDetector = () => {
       sourceCanvasRef.current = tmp;
       setOriginalImage(tmp.toDataURL("image/jpeg", 0.9));
       const preds = await model.detect(tmp);
-      const { persons, animals: a } = drawDetections(preds, w, h, tmp);
+      const { persons, animals: a, objects } = drawDetections(preds, w, h, tmp);
       setPersonCount(persons);
       setAnimalCount(a.length);
+      setObjectCount(objects);
       setAnimals(a);
-      setStatus(`Detection complete · ${persons} people · ${a.length} animals`);
+      setStatus(`Detection complete · ${persons} people · ${a.length} animals · ${objects} objects`);
       URL.revokeObjectURL(url);
     };
     img.src = url;
@@ -252,7 +263,7 @@ export const HumanDetector = () => {
   return (
     <div className="w-full max-w-6xl mx-auto">
       {/* HUD top bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-xs uppercase tracking-widest">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4 text-xs uppercase tracking-widest">
         <div className="border border-border bg-card/60 backdrop-blur px-4 py-3 flex items-center gap-2">
           <span className={cn("h-2 w-2 rounded-full", loading ? "bg-muted-foreground" : "bg-primary animate-pulse-ring")} />
           <span className="text-muted-foreground">Model</span>
@@ -268,9 +279,14 @@ export const HumanDetector = () => {
           <span className="ml-auto text-2xl font-bold text-primary text-glow leading-none">{personCount}</span>
         </div>
         <div className="border border-border bg-card/60 backdrop-blur px-4 py-3 flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-accent" />
+          <Sparkles className="h-3.5 w-3.5" style={{ color: "hsl(35 100% 55%)" }} />
           <span className="text-muted-foreground">Animals</span>
-          <span className="ml-auto text-2xl font-bold text-accent leading-none" style={{ color: "hsl(35 100% 55%)" }}>{animalCount}</span>
+          <span className="ml-auto text-2xl font-bold leading-none" style={{ color: "hsl(35 100% 55%)" }}>{animalCount}</span>
+        </div>
+        <div className="border border-border bg-card/60 backdrop-blur px-4 py-3 flex items-center gap-2">
+          <Boxes className="h-3.5 w-3.5" style={{ color: "hsl(280 100% 70%)" }} />
+          <span className="text-muted-foreground">Objects</span>
+          <span className="ml-auto text-2xl font-bold leading-none" style={{ color: "hsl(280 100% 70%)" }}>{objectCount}</span>
         </div>
       </div>
 
@@ -295,7 +311,7 @@ export const HumanDetector = () => {
                 <Sparkles className="h-3 w-3" />
                 Model Predicted
               </span>
-              <span className="text-muted-foreground">{personCount}P · {animalCount}A</span>
+              <span className="text-muted-foreground">{personCount}P · {animalCount}A · {objectCount}O</span>
             </figcaption>
           </figure>
         </div>
