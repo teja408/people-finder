@@ -263,7 +263,7 @@ export const HumanDetector = () => {
   return (
     <div className="w-full max-w-6xl mx-auto">
       {/* HUD top bar */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4 text-xs uppercase tracking-widest">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4 text-xs uppercase tracking-widest">
         <div className="border border-border bg-card/60 backdrop-blur px-4 py-3 flex items-center gap-2">
           <span className={cn("h-2 w-2 rounded-full", loading ? "bg-muted-foreground" : "bg-primary animate-pulse-ring")} />
           <span className="text-muted-foreground">Model</span>
@@ -279,9 +279,14 @@ export const HumanDetector = () => {
           <span className="ml-auto text-2xl font-bold text-primary text-glow leading-none">{personCount}</span>
         </div>
         <div className="border border-border bg-card/60 backdrop-blur px-4 py-3 flex items-center gap-2">
-          <Sparkles className="h-3.5 w-3.5 text-accent" />
+          <Sparkles className="h-3.5 w-3.5" style={{ color: "hsl(35 100% 55%)" }} />
           <span className="text-muted-foreground">Animals</span>
-          <span className="ml-auto text-2xl font-bold text-accent leading-none" style={{ color: "hsl(35 100% 55%)" }}>{animalCount}</span>
+          <span className="ml-auto text-2xl font-bold leading-none" style={{ color: "hsl(35 100% 55%)" }}>{animalCount}</span>
+        </div>
+        <div className="border border-border bg-card/60 backdrop-blur px-4 py-3 flex items-center gap-2">
+          <Boxes className="h-3.5 w-3.5" style={{ color: "hsl(280 100% 70%)" }} />
+          <span className="text-muted-foreground">Objects</span>
+          <span className="ml-auto text-2xl font-bold leading-none" style={{ color: "hsl(280 100% 70%)" }}>{objectCount}</span>
         </div>
       </div>
 
