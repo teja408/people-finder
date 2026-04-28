@@ -86,6 +86,8 @@ export const HumanDetector = () => {
   const [classifying, setClassifying] = useState<number | null>(null);
   const [species, setSpecies] = useState<Record<number, SpeciesResult>>({});
   const [originalImage, setOriginalImage] = useState<string | null>(null);
+  const [sceneLoading, setSceneLoading] = useState(false);
+  const [scene, setScene] = useState<SceneResult | null>(null);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
