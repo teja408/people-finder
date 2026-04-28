@@ -192,6 +192,7 @@ export const HumanDetector = () => {
       tmp.width = w; tmp.height = h;
       tmp.getContext("2d")!.drawImage(img, 0, 0, w, h);
       sourceCanvasRef.current = tmp;
+      setOriginalImage(tmp.toDataURL("image/jpeg", 0.9));
       const preds = await model.detect(tmp);
       const { persons, animals: a } = drawDetections(preds, w, h, tmp);
       setPersonCount(persons);
