@@ -8,8 +8,16 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 230 25% 6%;
+    --foreground: 180 100% 95%;
+
+    --neon: 158 100% 52%;
+    --neon-foreground: 230 25% 6%;
+    --danger: 350 100% 60%;
+    --grid: 180 60% 50%;
+
+    --gradient-hero: radial-gradient(ellipse at top, hsl(158 100% 52% / 0.15), transparent 60%), linear-gradient(180deg, hsl(230 30% 8%), hsl(230 25% 6%));
+    --shadow-neon: 0 0 40px hsl(var(--neon) / 0.4), 0 0 80px hsl(var(--neon) / 0.15);
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
