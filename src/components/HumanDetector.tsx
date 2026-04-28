@@ -171,6 +171,7 @@ export const HumanDetector = () => {
     setAnimalCount(0);
     setAnimals([]);
     setSpecies({});
+    setOriginalImage(null);
     const c = canvasRef.current;
     if (c) c.getContext("2d")?.clearRect(0, 0, c.width, c.height);
   };
