@@ -127,6 +127,7 @@ export const HumanDetector = () => {
     setMode("camera");
     setSpecies({});
     setAnimals([]);
+    setOriginalImage(null);
     setStatus("Requesting webcam...");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
