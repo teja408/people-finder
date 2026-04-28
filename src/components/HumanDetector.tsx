@@ -448,6 +448,8 @@ export const HumanDetector = () => {
       setSceneLoading(false);
     }
   };
+
+  return (
     <div className="w-full max-w-6xl mx-auto">
       {/* HUD top bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 mb-4 text-xs uppercase tracking-widest">
