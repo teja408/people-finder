@@ -31,6 +31,8 @@ type SpeciesResult = {
   facts: string[];
 };
 
+type SceneBox = { x_min: number; y_min: number; x_max: number; y_max: number };
+
 type SceneSubject = {
   name: string;
   category: "animal" | "person" | "object" | "plant" | "vehicle" | "food" | "other";
@@ -38,6 +40,7 @@ type SceneSubject = {
   count: number;
   confidence: number;
   facts: string[];
+  boxes?: SceneBox[];
 };
 
 type SceneResult = {
