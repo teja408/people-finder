@@ -244,7 +244,7 @@ export const HumanDetector = () => {
         }
 
         // Run detection with higher box budget for better recall
-        const preds = await model.detect(tmp, 40, 0.5);
+        const preds = await model.detect(tmp, 40, 0.35);
         const { persons, animals: a, objects } = drawDetections(preds, w, h, tmp);
         setPersonCount(persons);
         setAnimalCount(a.length);
